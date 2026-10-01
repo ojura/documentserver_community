@@ -65,7 +65,7 @@ class ConvertController extends Controller {
 				'endConvert' => true,
 			]);
 		} else {
-			$documentId = (int)$key;
+			$documentId = $this->getScratchDocumentId($key);
 			$documentFile = $this->urlDecoder->getFileForUrl($url);
 
 			// A failed conversion must come back as a structured {"error": <code>}
@@ -97,5 +97,38 @@ class ConvertController extends Controller {
 				'endConvert' => true,
 			]);
 		}
+	}
+
+	/**
+	 * The document id - and with it the doc_<id> folder - a conversion runs in.
+	 *
+	 * A key that is a document id, as the connector's editor-side conversions
+	 * send, keeps naming that document: its folder may hold the Editor.bin of
+	 * an open editing session, which the conversion is meant to reuse.
+	 *
+	 * Any other key gets a folder of its own. The connector's thumbnail
+	 * requests send "thumb_<revision>", which a plain (int) cast turns into 0,
+	 * so every thumbnail shared doc_0 and, because getDocumentForEditor()
+	 * reuses the Editor.bin it finds there, rendered whichever file had reached
+	 * the folder first. A hash of the key would not fix that properly: the
+	 * connector's keys carry only 32 bits to begin with, and editing sessions
+	 * take their ids from the same 32-bit range, so a collision would put a
+	 * thumbnail into a live editing session's folder, or a later editing
+	 * session onto a thumbnail's Editor.bin - and that session's changes would
+	 * then be written to the file the thumbnail was made from.
+	 *
+	 * So the id is random and negative. The connector's editing sessions never
+	 * get a negative id (their keys are crc32 values), two conversions never
+	 * share a folder, not even for the same key, and the folder's name cannot
+	 * be guessed. Nothing is lost by not reusing it: every conversion here runs
+	 * synchronously, and the Cleanup job removes the folder on a later run.
+	 */
+	private function getScratchDocumentId(string $key): int {
+		$documentId = (int)$key;
+		if ($documentId > 0 && (string)$documentId === $key) {
+			return $documentId;
+		}
+
+		return -random_int(1, PHP_INT_MAX);
 	}
 }
