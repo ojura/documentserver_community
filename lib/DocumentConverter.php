@@ -53,10 +53,9 @@ class DocumentConverter {
 	/**
 	 * Convert a source file straight to the target format, in one x2t run.
 	 *
-	 * This is how ONLYOFFICE's own conversion service converts. Going through
-	 * Editor.bin first fails for the fixed-layout formats (pdf, djvu, xps),
-	 * which x2t cannot turn into an editor document, and costs a second
-	 * converter run for everything else.
+	 * Going through Editor.bin first fails for the formats x2t cannot turn
+	 * into an editor document, pdf, xps and vsdx among them, and costs a
+	 * second converter run for every other format.
 	 */
 	public function convertSource($source, string $sourceExtension, string $target, int $targetFormat, ?TextOptions $textOptions = null) {
 		$sourceFile = $this->tempManager->getTemporaryFile(".$sourceExtension");

@@ -134,8 +134,8 @@ class ConvertCommand implements XmlSerializable {
 			}
 		}
 
-		// Only when set, so that every other conversion sends x2t exactly the
-		// command it always has.
+		// Only when set: a format that takes no text options gets no text
+		// fields.
 		if ($this->textOptions) {
 			$textFields = [
 				"m_nCsvTxtEncoding" => $this->textOptions->getCodePage(),

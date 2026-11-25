@@ -41,7 +41,7 @@ use Test\TestCase;
 
 /**
  * Which conversion the conversion endpoint gets. Going through Editor.bin
- * first fails for pdf, djvu and xps, which x2t cannot open as an editor
+ * first fails for pdf, xps and vsdx, which x2t cannot open as an editor
  * document, and for txt, csv and tsv unless x2t is given an encoding and a
  * delimiter; so a file is converted directly, with the text defaults. Only an
  * open editing session's Editor.bin is converted from, because that is what

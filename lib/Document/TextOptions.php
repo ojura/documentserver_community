@@ -31,8 +31,9 @@ namespace OCA\DocumentServer\Document;
  * (ConverterBinary::STATUS_NEEDS_PARAMETERS) and writes nothing. An editor
  * answers that by asking the user and reopening with the choice, which
  * fromOpenCommand() reads. A conversion without an editor (a thumbnail, the
- * connector's "convert" action) uses defaultsFor(), the values ONLYOFFICE's
- * own conversion service falls back to: UTF-8, comma for csv, tab for tsv.
+ * connector's "convert" action) uses defaultsFor(): UTF-8 and, for csv, a
+ * comma, which is what sdkjs itself uses when nobody chooses (for its mail
+ * merge data, and as the import dialog's delimiter), and a tab for tsv.
  *
  * The numbers are sdkjs's, not code pages: AscCommon.c_oAscCodePageUtf8 is 46
  * and AscCommon.c_oAscCsvDelimiter is {None: 0, Tab: 1, Semicolon: 2,

@@ -109,8 +109,8 @@ class ConvertController extends Controller {
 	 * requests send "thumb_<revision>", which a plain (int) cast turns into 0,
 	 * so every thumbnail shared doc_0 and, because the conversion reuses the
 	 * Editor.bin it finds there (DocumentStore::convertFile), rendered
-	 * whichever file had reached the folder first. A hash of the key would not fix that properly: the
-	 * connector's keys carry only 32 bits to begin with, and editing sessions
+	 * whichever file had reached the folder first. A hash of the key would not
+	 * fix that properly: the connector's keys carry only 32 bits to begin with, and editing sessions
 	 * take their ids from the same 32-bit range, so a collision would put a
 	 * thumbnail into a live editing session's folder, or a later editing
 	 * session onto a thumbnail's Editor.bin - and that session's changes would
