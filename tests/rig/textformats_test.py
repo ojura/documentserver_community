@@ -150,10 +150,12 @@ def check_thumbnails(args, user, password, ids):
 
 DIALOG_JS = r"""(() => {
   // ONLYOFFICE's import dialog (Common.Views.OpenDialog): which of its
-  // controls are showing.
+  // controls are showing. The dialog is position: fixed, which makes
+  // offsetParent null even while it is on screen, so this asks for its box.
   try {
     const d = document.querySelector('iframe').contentDocument;
-    const win = [...d.querySelectorAll('.asc-window')].find(w => w.offsetParent !== null
+    const shown = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const win = [...d.querySelectorAll('.asc-window')].find(w => shown(w)
       && (w.querySelector('#id-codepages-combo') || w.querySelector('#id-delimiters-combo')));
     if (!win) return null;
     return JSON.stringify({
@@ -180,7 +182,8 @@ PICK_JS = r"""(() => {
 OK_JS = r"""(() => {
   try {
     const d = document.querySelector('iframe').contentDocument;
-    const ok = [...d.querySelectorAll('.asc-window .dlg-btn[result="ok"]')].find(b => b.offsetParent !== null);
+    const shown = el => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    const ok = [...d.querySelectorAll('.asc-window .dlg-btn[result="ok"]')].find(shown);
     if (!ok) return 'no OK button';
     ok.click();
     return 'confirmed';
