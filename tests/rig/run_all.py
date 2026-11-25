@@ -44,6 +44,9 @@ SUITE = [
     ('pdf', 'pdf_test.py', [],
      'a converted PDF has the text in it, a font that cannot be loaded is '
      'logged, and a rebuild that cannot write fails loudly'),
+    ('textformats', 'textformats_test.py', [],
+     'txt, csv, tsv and pdf files get thumbnails, and txt and csv open '
+     "through the editor's encoding and delimiter dialog"),
 ]
 
 
