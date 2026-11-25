@@ -53,6 +53,10 @@ occ app:enable documentserver_community | sed 's/^/   /'
 # an editor iframe on a different origin than the page cannot be framed by it,
 # nor read by the tests.
 occ config:app:set onlyoffice DocumentServerUrl --value "${BASE}/apps/documentserver_community/" | sed 's/^/   /'
+# The connector also calls the document server itself, for thumbnails and its
+# "convert" action, from inside the container, where the published port does
+# not exist. The browser keeps using the url above.
+occ config:app:set onlyoffice DocumentServerInternalUrl --value "http://localhost/apps/documentserver_community/" | sed 's/^/   /'
 
 echo "==> the app's own setup check"
 in_app "php -r '

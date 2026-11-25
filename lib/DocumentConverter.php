@@ -27,6 +27,7 @@ use OCA\DocumentServer\Document\Change;
 use OCA\DocumentServer\Document\ConvertCommand;
 use OCA\DocumentServer\Document\ConverterBinary;
 use OCA\DocumentServer\Document\DocumentFormat;
+use OCA\DocumentServer\Document\TextOptions;
 use OCP\ITempManager;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -42,11 +43,25 @@ class DocumentConverter {
 		$this->converter = $converterBinary;
 	}
 
-	public function getEditorBinary($source, string $sourceExtension, string $targetFolder, ?string $password = null) {
+	public function getEditorBinary($source, string $sourceExtension, string $targetFolder, ?string $password = null, ?TextOptions $textOptions = null) {
 		$sourceFile = $this->tempManager->getTemporaryFile(".$sourceExtension");
 		file_put_contents($sourceFile, $source);
 
-		$this->convertFiles($sourceFile, "$targetFolder/Editor.bin", DocumentFormat::AVS_OFFICESTUDIO_FILE_CANVAS, $password);
+		$this->convertFiles($sourceFile, "$targetFolder/Editor.bin", DocumentFormat::AVS_OFFICESTUDIO_FILE_CANVAS, $password, $textOptions);
+	}
+
+	/**
+	 * Convert a source file straight to the target format, in one x2t run.
+	 *
+	 * Going through Editor.bin first fails for the formats x2t cannot turn
+	 * into an editor document, pdf, xps and vsdx among them, and costs a
+	 * second converter run for every other format.
+	 */
+	public function convertSource($source, string $sourceExtension, string $target, int $targetFormat, ?TextOptions $textOptions = null) {
+		$sourceFile = $this->tempManager->getTemporaryFile(".$sourceExtension");
+		file_put_contents($sourceFile, $source);
+
+		$this->convertFiles($sourceFile, $target, $targetFormat, null, $textOptions);
 	}
 
 	/**
@@ -106,9 +121,10 @@ class DocumentConverter {
 	}
 
 
-	public function convertFiles(string $from, string $to, int $targetFormat = DocumentFormat::AVS_OFFICESTUDIO_FILE_CANVAS, ?string $password = null) {
+	public function convertFiles(string $from, string $to, int $targetFormat = DocumentFormat::AVS_OFFICESTUDIO_FILE_CANVAS, ?string $password = null, ?TextOptions $textOptions = null) {
 		$command = new ConvertCommand($from, $to);
 		$command->setTargetFormat($targetFormat);
+		$command->setTextOptions($textOptions);
 
 		$this->runCommand($command, $password);
 	}

@@ -24,10 +24,12 @@ declare(strict_types=1);
 namespace OCA\DocumentServer\Tests\Controller;
 
 use OCA\DocumentServer\Controller\ConvertController;
+use OCA\DocumentServer\Document\DocumentConversionException;
 use OCA\DocumentServer\Document\DocumentStore;
+use OCA\DocumentServer\Document\ParametersRequiredException;
+use OCA\DocumentServer\Document\PasswordRequiredException;
 use OCA\DocumentServer\OnlyOffice\URLDecoder;
 use OCP\Files\File;
-use OCP\Files\SimpleFS\ISimpleFile;
 use OCP\IRequest;
 use OCP\IURLGenerator;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -43,28 +45,23 @@ class ConvertControllerTest extends TestCase {
 	private ConvertController $controller;
 	/** @var DocumentStore&\PHPUnit\Framework\MockObject\MockObject */
 	private $documentStore;
-	/** @var int[] document ids handed to getDocumentForEditor(), in call order */
-	private array $editorIds = [];
-	/** @var int[] document ids handed to convert(), in call order */
-	private array $convertIds = [];
+	/** @var array[] the arguments of each convertFile() call, in call order */
+	private array $conversions = [];
+	private File $sourceFile;
 
 	protected function setUp(): void {
 		parent::setUp();
 
 		$this->documentStore = $this->createMock(DocumentStore::class);
-		$this->documentStore->method('getDocumentForEditor')
-			->willReturnCallback(function (int $documentId): ISimpleFile {
-				$this->editorIds[] = $documentId;
-				return $this->createMock(ISimpleFile::class);
-			});
-		$this->documentStore->method('convert')
-			->willReturnCallback(function (int $documentId, string $targetFormat): string {
-				$this->convertIds[] = $documentId;
+		$this->documentStore->method('convertFile')
+			->willReturnCallback(function (int $documentId, File $file, string $sourceFormat, string $targetFormat): string {
+				$this->conversions[] = [$documentId, $file, $sourceFormat, $targetFormat];
 				return '/convert.' . $targetFormat;
 			});
 
+		$this->sourceFile = $this->createMock(File::class);
 		$urlDecoder = $this->createMock(URLDecoder::class);
-		$urlDecoder->method('getFileForUrl')->willReturn($this->createMock(File::class));
+		$urlDecoder->method('getFileForUrl')->willReturn($this->sourceFile);
 
 		$urlGenerator = $this->createMock(IURLGenerator::class);
 		$urlGenerator->method('linkToRouteAbsolute')
@@ -82,15 +79,14 @@ class ConvertControllerTest extends TestCase {
 
 	/**
 	 * Convert a document under $key and return the document id the controller
-	 * used. The source conversion, the output and the url handed back to the
-	 * connector must all name the same folder.
+	 * used. The conversion and the url handed back to the connector must name
+	 * the same folder.
 	 */
 	private function convertWithKey(string $key): int {
 		$response = $this->controller->convert(false, 'https://cloud.example.com/file', 'jpg', 'docx', 'Document', $key);
 
-		$documentId = end($this->editorIds);
+		$documentId = end($this->conversions)[0];
 		$this->assertIsInt($documentId);
-		$this->assertSame($documentId, end($this->convertIds));
 		$this->assertSame(
 			'https://cloud.example.com/open/' . $documentId . '/convert.jpg',
 			$response->getData()['fileUrl']
@@ -150,11 +146,51 @@ class ConvertControllerTest extends TestCase {
 
 	public function testSameFormatIsNotConverted(): void {
 		// the connector's health check: docx to docx under "check_<n>"
-		$this->documentStore->expects($this->never())->method('getDocumentForEditor');
-		$this->documentStore->expects($this->never())->method('convert');
+		$this->documentStore->expects($this->never())->method('convertFile');
 
 		$response = $this->controller->convert(false, 'https://cloud.example.com/file', 'docx', 'docx', 'Document', 'check_12345');
 
 		$this->assertSame('https://cloud.example.com/file', $response->getData()['fileUrl']);
+	}
+
+	public function testTheFileAndBothFormatsReachTheConversion(): void {
+		// the connector's thumbnail request for a csv file
+		$this->controller->convert(false, 'https://cloud.example.com/file', 'jpg', 'csv', 'Table', 'thumb_42');
+
+		[, $file, $sourceFormat, $targetFormat] = end($this->conversions);
+		$this->assertSame($this->sourceFile, $file);
+		$this->assertSame('csv', $sourceFormat);
+		$this->assertSame('jpg', $targetFormat);
+	}
+
+	public static function failures(): array {
+		return [
+			'a conversion error' => [new DocumentConversionException('x2t exited with status 88'), -3],
+			'missing text options' => [new ParametersRequiredException('x2t needs the encoding'), -3],
+			'a password' => [new PasswordRequiredException(90), -5],
+		];
+	}
+
+	/**
+	 * The connector reads {"error": <code>} and logs what it means; an
+	 * exception escaping as a 500 is something it cannot interpret.
+	 */
+	#[DataProvider('failures')]
+	public function testAFailedConversionIsAnErrorCode(DocumentConversionException $failure, int $code): void {
+		$store = $this->createMock(DocumentStore::class);
+		$store->method('convertFile')->willThrowException($failure);
+		$urlDecoder = $this->createMock(URLDecoder::class);
+		$urlDecoder->method('getFileForUrl')->willReturn($this->sourceFile);
+		$controller = new ConvertController(
+			'documentserver_community',
+			$this->createMock(IRequest::class),
+			$store,
+			$urlDecoder,
+			$this->createMock(IURLGenerator::class)
+		);
+
+		$response = $controller->convert(false, 'https://cloud.example.com/file', 'jpg', 'pdf', 'Paper', 'thumb_42');
+
+		$this->assertSame(['error' => $code], $response->getData());
 	}
 }

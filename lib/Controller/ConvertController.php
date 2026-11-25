@@ -76,8 +76,7 @@ class ConvertController extends Controller {
 			// error codes differ from the editor's c_oAscError space used in the
 			// socket replies: -5 incorrect password, -3 conversion error.
 			try {
-				$this->documentStore->getDocumentForEditor($documentId, $documentFile, $filetype);
-				$this->documentStore->convert($documentId, $outputtype);
+				$this->documentStore->convertFile($documentId, $documentFile, $filetype, $outputtype);
 			} catch (PasswordRequiredException $e) {
 				return new JSONResponse(['error' => -5]);
 			} catch (DocumentConversionException $e) {
@@ -108,10 +107,10 @@ class ConvertController extends Controller {
 	 *
 	 * Any other key gets a folder of its own. The connector's thumbnail
 	 * requests send "thumb_<revision>", which a plain (int) cast turns into 0,
-	 * so every thumbnail shared doc_0 and, because getDocumentForEditor()
-	 * reuses the Editor.bin it finds there, rendered whichever file had reached
-	 * the folder first. A hash of the key would not fix that properly: the
-	 * connector's keys carry only 32 bits to begin with, and editing sessions
+	 * so every thumbnail shared doc_0 and, because the conversion reuses the
+	 * Editor.bin it finds there (DocumentStore::convertFile), rendered
+	 * whichever file had reached the folder first. A hash of the key would not
+	 * fix that properly: the connector's keys carry only 32 bits to begin with, and editing sessions
 	 * take their ids from the same 32-bit range, so a collision would put a
 	 * thumbnail into a live editing session's folder, or a later editing
 	 * session onto a thumbnail's Editor.bin - and that session's changes would

@@ -161,11 +161,16 @@ def restore_document(kind):
 
 
 def doc_folders():
-    """Open documents, ignoring doc_0 - the scratch folder the connector's
-    preview conversions go through, which has nothing to do with editing."""
+    """Open documents: the folders of editing sessions, whose ids are positive.
+
+    A conversion without a document id - the connector's thumbnails - runs in
+    a folder of its own with a negative id (ConvertController::
+    getScratchDocumentId), which has nothing to do with editing and stays until
+    the Cleanup job removes it."""
     out = app_exec('ls -d /var/www/html/data/appdata_*/documentserver_community/doc_* '
                    '2>/dev/null')
-    return len([line for line in out.split() if not line.endswith('/doc_0')])
+    ids = [line.rsplit('/doc_', 1)[1] for line in out.split() if '/doc_' in line]
+    return len([i for i in ids if i.isdigit() and int(i) > 0])
 
 
 def snapshot_state():

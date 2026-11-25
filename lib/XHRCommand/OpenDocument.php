@@ -25,7 +25,9 @@ namespace OCA\DocumentServer\XHRCommand;
 
 use OCA\DocumentServer\Channel\Session;
 use OCA\DocumentServer\Document\DocumentStore;
+use OCA\DocumentServer\Document\ParametersRequiredException;
 use OCA\DocumentServer\Document\PasswordRequiredException;
+use OCA\DocumentServer\Document\TextOptions;
 use OCA\DocumentServer\IPC\IIPCChannel;
 use OCA\DocumentServer\OnlyOffice\URLDecoder;
 use OCP\Http\Client\IClientService;
@@ -106,7 +108,28 @@ class OpenDocument implements ICommandHandler {
 
 		$documentFile = $this->urlDecoder->getFileForUrl($documentUrl);
 		try {
-			$this->documentStore->getDocumentForEditor($docId, $documentFile, $inputFormat, $password);
+			$this->documentStore->getDocumentForEditor($docId, $documentFile, $inputFormat, $password, TextOptions::fromOpenCommand($openCmd));
+		} catch (ParametersRequiredException $e) {
+			// A plain text format that x2t needs the encoding (and delimiter)
+			// for. The editor answers "needparams" by showing the user the
+			// start of the file in a dialog, loaded from data, and reopens with
+			// their choice, which fromOpenCommand() picks up.
+			$this->documentStore->stashDocumentUrl($docId, $documentUrl);
+			$path = $this->documentStore->saveSourceFile($docId, $documentFile, $inputFormat);
+			$sessionChannel->pushMessage(json_encode([
+				'type' => 'documentOpen',
+				'data' => [
+					'type' => 'open',
+					'status' => 'needparams',
+					'data' => $this->urlGenerator->linkToRouteAbsolute(
+						'documentserver_community.Document.documentFile', [
+							'path' => $path,
+							'docId' => $docId,
+						]
+					),
+				],
+			]));
+			return;
 		} catch (PasswordRequiredException $e) {
 			$this->documentStore->stashDocumentUrl($docId, $documentUrl);
 			$sessionChannel->pushMessage(json_encode([

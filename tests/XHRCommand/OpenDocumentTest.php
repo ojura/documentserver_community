@@ -25,9 +25,13 @@ namespace OCA\DocumentServer\Tests\XHRCommand;
 
 use OCA\DocumentServer\Channel\Session;
 use OCA\DocumentServer\Document\DocumentStore;
+use OCA\DocumentServer\Document\ParametersRequiredException;
+use OCA\DocumentServer\Document\TextOptions;
 use OCA\DocumentServer\IPC\IIPCChannel;
 use OCA\DocumentServer\OnlyOffice\URLDecoder;
 use OCA\DocumentServer\XHRCommand\OpenDocument;
+use OCP\Files\File;
+use OCP\Files\SimpleFS\ISimpleFile;
 use OCP\Http\Client\IClient;
 use OCP\Http\Client\IClientService;
 use OCP\ISession;
@@ -151,5 +155,99 @@ class OpenDocumentTest extends TestCase {
 		[, $reply] = $this->importImages(['https://example.com/image.png']);
 
 		$this->assertEquals(-104, $reply['data']['data']['error']);
+	}
+
+	/**
+	 * A handler whose url decoder returns $file and whose url generator names
+	 * the document folder and path, for the open command's tests.
+	 */
+	private function openHandler(File $file): OpenDocument {
+		$urlDecoder = $this->createMock(URLDecoder::class);
+		$urlDecoder->method('getFileForUrl')->willReturn($file);
+		$urlGenerator = $this->createMock(IURLGenerator::class);
+		$urlGenerator->method('linkToRouteAbsolute')
+			->willReturnCallback(static fn (string $route, array $parameters): string
+				=> 'https://cloud.example.com/open/' . $parameters['docId'] . '/' . $parameters['path']);
+
+		return new OpenDocument(
+			$urlGenerator,
+			$this->documentStore,
+			$urlDecoder,
+			$this->createMock(ISession::class),
+			$this->clientService,
+			$this->createMock(LoggerInterface::class)
+		);
+	}
+
+	private function open(OpenDocument $handler, array $command): array {
+		$reply = [];
+		$channel = $this->createMock(IIPCChannel::class);
+		$channel->method('pushMessage')->willReturnCallback(function (string $message) use (&$reply) {
+			$reply = json_decode($message, true);
+		});
+		$handler->openDocument($command + ['id' => '5', 'format' => 'csv'], $channel);
+		return $reply;
+	}
+
+	/**
+	 * x2t will not open a csv without an encoding and a delimiter. The editor
+	 * asks the user for them when the open is answered with "needparams", and
+	 * shows the start of the file from the url in data while it does.
+	 */
+	public function testATextFileIsAnsweredWithTheOptionsDialog(): void {
+		$file = $this->createMock(File::class);
+		$this->documentStore->method('getDocumentForEditor')
+			->willThrowException(new ParametersRequiredException('needs options'));
+		$this->documentStore->expects($this->once())->method('stashDocumentUrl')
+			->with(5, 'https://cloud.example.com/remote/table.csv');
+		$this->documentStore->expects($this->once())->method('saveSourceFile')
+			->with(5, $file, 'csv')->willReturn('origin.csv');
+
+		$reply = $this->open($this->openHandler($file), ['c' => 'open', 'url' => 'https://cloud.example.com/remote/table.csv']);
+
+		$this->assertSame([
+			'type' => 'documentOpen',
+			'data' => [
+				'type' => 'open',
+				'status' => 'needparams',
+				'data' => 'https://cloud.example.com/open/5/origin.csv',
+			],
+		], $reply);
+	}
+
+	/**
+	 * The editor reopens with the user's choice, and without the url, which was
+	 * stashed when the options were asked for.
+	 */
+	public function testTheReopenCarriesTheUsersChoiceToTheConverter(): void {
+		$file = $this->createMock(File::class);
+		$this->documentStore->method('getStashedDocumentUrl')->with(5)->willReturn('https://cloud.example.com/remote/table.csv');
+		$this->documentStore->method('getEmbeddedFiles')->willReturn([]);
+		$this->documentStore->expects($this->once())->method('getDocumentForEditor')->with(
+			5,
+			$file,
+			'csv',
+			null,
+			$this->callback(static fn (?TextOptions $options): bool => $options !== null
+				&& $options->getCodePage() === 46
+				&& $options->getDelimiter() === 2)
+		)->willReturn($this->createMock(ISimpleFile::class));
+
+		$reply = $this->open($this->openHandler($file), ['c' => 'reopen', 'codepage' => 46, 'delimiter' => [2], 'delimiterChar' => null]);
+
+		$this->assertSame('ok', $reply['data']['status']);
+		$this->assertSame('https://cloud.example.com/open/5/Editor.bin', $reply['data']['data']['Editor.bin']);
+	}
+
+	public function testAnOpenWithoutAChoicePassesNoOptions(): void {
+		$this->documentStore->method('getEmbeddedFiles')->willReturn([]);
+		$this->documentStore->expects($this->once())->method('getDocumentForEditor')
+			->with(5, $this->anything(), 'docx', null, null)
+			->willReturn($this->createMock(ISimpleFile::class));
+
+		$reply = $this->open($this->openHandler($this->createMock(File::class)),
+			['c' => 'open', 'url' => 'https://cloud.example.com/remote/letter.docx', 'format' => 'docx']);
+
+		$this->assertSame('ok', $reply['data']['status']);
 	}
 }
