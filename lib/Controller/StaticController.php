@@ -27,6 +27,7 @@ use OC\ForbiddenException;
 use OC\Security\CSP\ContentSecurityPolicy;
 use OC\Security\CSP\ContentSecurityPolicyNonceManager;
 use OCA\DocumentServer\Channel\SessionManager;
+use OCA\DocumentServer\EditorBasePath;
 use OCA\DocumentServer\FileResponse;
 use OCA\DocumentServer\SetupCheck;
 use OCP\AppFramework\Controller;
@@ -45,6 +46,7 @@ class StaticController extends Controller {
 	private $setupCheck;
 	private $sessionManager;
 	private $urlGenerator;
+	private $editorBasePath;
 
 	public function __construct(
 		$appName,
@@ -53,7 +55,8 @@ class StaticController extends Controller {
 		ContentSecurityPolicyNonceManager $nonceManager,
 		SetupCheck $setupCheck,
 		SessionManager $sessionManager,
-		IURLGenerator $urlGenerator
+		IURLGenerator $urlGenerator,
+		EditorBasePath $editorBasePath
 	) {
 		parent::__construct($appName, $request);
 
@@ -62,6 +65,7 @@ class StaticController extends Controller {
 		$this->setupCheck = $setupCheck;
 		$this->sessionManager = $sessionManager;
 		$this->urlGenerator = $urlGenerator;
+		$this->editorBasePath = $editorBasePath;
 	}
 
 	#[NoCSRFRequired]
@@ -139,7 +143,8 @@ class StaticController extends Controller {
 			if (file_exists($localPath)) {
 				return $this->createFileResponseWithContent(
 					$localPath,
-					file_get_contents($localPath) . "\n" . $this->closeBeacon('close-beacon-host.js')
+					$this->editorBasePath->extensionParamsScript()
+						. file_get_contents($localPath) . "\n" . $this->closeBeacon('close-beacon-host.js')
 				);
 			}
 		}
