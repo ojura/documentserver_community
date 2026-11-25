@@ -45,6 +45,8 @@ class ConvertCommand implements XmlSerializable {
 	private $noBase64 = null;
 	/** @var \DateTime */
 	private $timeStamp;
+	/** @var TextOptions|null */
+	private $textOptions = null;
 
 	public function __construct(string $fileFrom, string $fileTo) {
 		$this->fileFrom = $fileFrom;
@@ -91,6 +93,10 @@ class ConvertCommand implements XmlSerializable {
 		$this->fileTo = $fileTo;
 	}
 
+	public function setTextOptions(?TextOptions $textOptions): void {
+		$this->textOptions = $textOptions;
+	}
+
 	public function xmlSerialize(Writer $writer) {
 		$xsiNS = "{http://www.w3.org/2001/XMLSchema-instance}";
 		$keyMap = [
@@ -125,6 +131,24 @@ class ConvertCommand implements XmlSerializable {
 					"name" => $key,
 					"value" => $value,
 				]);
+			}
+		}
+
+		// Only when set, so that every other conversion sends x2t exactly the
+		// command it always has.
+		if ($this->textOptions) {
+			$textFields = [
+				"m_nCsvTxtEncoding" => $this->textOptions->getCodePage(),
+				"m_nCsvDelimiter" => $this->textOptions->getDelimiter(),
+				"m_nCsvDelimiterChar" => $this->textOptions->getDelimiterChar(),
+			];
+			foreach ($textFields as $key => $value) {
+				if ($value !== null) {
+					$writer->write([
+						"name" => $key,
+						"value" => $value,
+					]);
+				}
 			}
 		}
 	}

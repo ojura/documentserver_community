@@ -85,7 +85,7 @@ class DocumentStore {
 		}
 	}
 
-	public function getDocumentForEditor(int $documentId, File $sourceFile, string $sourceFormat, ?string $password = null): ISimpleFile {
+	public function getDocumentForEditor(int $documentId, File $sourceFile, string $sourceFormat, ?string $password = null, ?TextOptions $textOptions = null): ISimpleFile {
 		$docFolder = $this->getDocumentFolder($documentId);
 		try {
 			return $docFolder->getFile('Editor.bin');
@@ -106,8 +106,8 @@ class DocumentStore {
 				throw new NotFoundException();
 			}
 
-			$this->localAppData->getReadWriteLocalPath($docFolder, function (string $localPath) use ($source, $sourceFormat, $password) {
-				$this->documentConverter->getEditorBinary($source, $sourceFormat, $localPath, $password);
+			$this->localAppData->getReadWriteLocalPath($docFolder, function (string $localPath) use ($source, $sourceFormat, $password, $textOptions) {
+				$this->documentConverter->getEditorBinary($source, $sourceFormat, $localPath, $password, $textOptions);
 			});
 
 			// maybe save in a new db table
@@ -280,6 +280,59 @@ class DocumentStore {
 		});
 
 		return $title;
+	}
+
+	/**
+	 * Convert a file for the conversion endpoint, into the document's folder.
+	 *
+	 * When the folder holds the Editor.bin of an open editing session, that is
+	 * what the conversion is meant to see (see
+	 * ConvertController::getScratchDocumentId), so it is converted from there.
+	 * Anything else is converted straight from the file, with the text options
+	 * a conversion without an editor uses for its format.
+	 *
+	 * @return string the converted file's path in the document's folder
+	 */
+	public function convertFile(int $documentId, File $sourceFile, string $sourceFormat, string $targetFormat): string {
+		$docFolder = $this->getDocumentFolder($documentId);
+		if ($docFolder->fileExists('Editor.bin')) {
+			return $this->convert($documentId, $targetFormat);
+		}
+
+		$source = $sourceFile->fopen('r');
+		if (!$source) {
+			throw new NotFoundException();
+		}
+
+		$this->localAppData->getReadWriteLocalPath($docFolder, function (string $localPath) use ($source, $sourceFormat, $targetFormat) {
+			$this->documentConverter->convertSource(
+				$source,
+				$sourceFormat,
+				$localPath . '/convert.' . $targetFormat,
+				DocumentFormat::getFormatFromExtension($targetFormat),
+				TextOptions::defaultsFor($sourceFormat)
+			);
+		});
+
+		return '/convert.' . $targetFormat;
+	}
+
+	/**
+	 * Put a copy of the file an editor is opening into the document's folder.
+	 *
+	 * When x2t needs the encoding or delimiter, the editor shows the user the
+	 * start of the file to choose them by, and loads it from this copy.
+	 *
+	 * @return string the copy's path in the document's folder
+	 */
+	public function saveSourceFile(int $documentId, File $sourceFile, string $sourceFormat): string {
+		$path = 'origin.' . $sourceFormat;
+		$source = $sourceFile->fopen('r');
+		if (!$source) {
+			throw new NotFoundException();
+		}
+		$this->getDocumentFolder($documentId)->newFile($path)->putContent($source);
+		return $path;
 	}
 
 	public function convert(int $documentId, string $targetFormat): string {

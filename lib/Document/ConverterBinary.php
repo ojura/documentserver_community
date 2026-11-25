@@ -28,6 +28,15 @@ use Psr\Log\LoggerInterface;
 class ConverterBinary {
 	public const BINARY_DIRECTORY = __DIR__ . '/../../3rdparty/onlyoffice/documentserver/server/FileConverter/bin';
 
+	/**
+	 * x2t's exit statuses for a document it will not open as it is: the
+	 * AVS_FILEUTILS_ERROR_CONVERT_NEED_PARAMS, _PASSWORD and _DRM codes of
+	 * ONLYOFFICE's core.
+	 */
+	public const STATUS_NEEDS_PARAMETERS = 89;
+	public const STATUS_PASSWORD = 90;
+	public const STATUS_DRM = 91;
+
 	/** What x2t prints on stdout, and only on stdout, for a font it cannot open. */
 	private const MISSING_FONT = "Can't load fontfile ";
 
@@ -70,8 +79,12 @@ class ConverterBinary {
 
 		$status = proc_close($process);
 
-		if ($status == 90 || $status == 91) {
+		if ($status === self::STATUS_PASSWORD || $status === self::STATUS_DRM) {
 			throw new PasswordRequiredException($status);
+		}
+
+		if ($status === self::STATUS_NEEDS_PARAMETERS) {
+			throw new ParametersRequiredException("x2t needs the encoding or delimiter for this format");
 		}
 
 		if ($error) {
