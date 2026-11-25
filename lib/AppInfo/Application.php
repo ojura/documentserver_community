@@ -26,7 +26,6 @@ use OCA\DocumentServer\IPC\IIPCFactory;
 use OCA\DocumentServer\IPC\IPCFactory;
 use OCA\DocumentServer\IPC\MemcacheIPCFactory;
 use OCA\DocumentServer\IPC\RedisIPCFactory;
-use OCA\DocumentServer\JSSettingsHelper;
 use OCA\DocumentServer\OnlyOffice\AutoConfig;
 use OCA\DocumentServer\OnlyOffice\BundledFormats;
 use OCA\DocumentServer\OnlyOffice\URLDecoder;
@@ -42,7 +41,6 @@ use OCP\Files\IRootFolder;
 use OCP\IURLGenerator;
 use OCP\IUserSession;
 use OCP\Share\IManager;
-use OCP\Util;
 use OCP\ICacheFactory;
 use Psr\Log\LoggerInterface;
 
@@ -126,13 +124,8 @@ class Application extends App implements IBootstrap {
 		$context->injectFn(function (IAppManager $appManager) {
 			if ($appManager->isEnabledForUser('onlyoffice')) {
 				$this->getAutoConfig()->autoConfigIfNeeded();
-				Util::connectHook('\OCP\Config', 'js', $this->getJSSettingsHelper(), 'extend');
 			}
 		});
-	}
-
-	private function getJSSettingsHelper(): JSSettingsHelper {
-		return $this->getContainer()->get(JSSettingsHelper::class);
 	}
 
 	private function getAutoConfig(): AutoConfig {
