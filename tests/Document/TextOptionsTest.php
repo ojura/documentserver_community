@@ -80,6 +80,15 @@ class TextOptionsTest extends TestCase {
 		$this->assertNull($options->getDelimiterChar());
 	}
 
+	public function testTheSpreadsheetEditorsListOfDelimitersGivesItsFirst(): void {
+		// what the editor really sends after its import dialog
+		$options = TextOptions::fromOpenCommand(['c' => 'reopen', 'codepage' => 46, 'delimiter' => [2], 'delimiterChar' => null]);
+		$this->assertSame(2, $options->getDelimiter());
+
+		$this->assertSame(2, TextOptions::fromOpenCommand(['codepage' => 46, 'delimiter' => [2, 4]])->getDelimiter());
+		$this->assertNull(TextOptions::fromOpenCommand(['codepage' => 46, 'delimiter' => []])->getDelimiter());
+	}
+
 	public function testADelimiterOfTheUsersOwnIsKept(): void {
 		$options = TextOptions::fromOpenCommand(['c' => 'reopen', 'codepage' => 46, 'delimiter' => 0, 'delimiterChar' => '|']);
 

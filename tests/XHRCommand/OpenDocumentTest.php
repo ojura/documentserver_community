@@ -233,7 +233,7 @@ class OpenDocumentTest extends TestCase {
 				&& $options->getDelimiter() === 2)
 		)->willReturn($this->createMock(ISimpleFile::class));
 
-		$reply = $this->open($this->openHandler($file), ['c' => 'reopen', 'codepage' => 46, 'delimiter' => 2, 'delimiterChar' => null]);
+		$reply = $this->open($this->openHandler($file), ['c' => 'reopen', 'codepage' => 46, 'delimiter' => [2], 'delimiterChar' => null]);
 
 		$this->assertSame('ok', $reply['data']['status']);
 		$this->assertSame('https://cloud.example.com/open/5/Editor.bin', $reply['data']['data']['Editor.bin']);

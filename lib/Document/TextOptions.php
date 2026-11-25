@@ -80,13 +80,19 @@ class TextOptions {
 	 *
 	 * The text editor sends only "codepage"; the spreadsheet editor adds
 	 * "delimiter", and "delimiterChar" when the user typed a delimiter of
-	 * their own.
+	 * their own. The spreadsheet editor sends "delimiter" as a list, [2] for
+	 * semicolon; x2t reads one delimiter (given "2,4" it splits at the 2), so
+	 * the first one is passed on.
 	 */
 	public static function fromOpenCommand(array $command): ?self {
 		if (!isset($command['codepage']) || !is_numeric($command['codepage'])) {
 			return null;
 		}
-		$delimiter = isset($command['delimiter']) && is_numeric($command['delimiter']) ? (int)$command['delimiter'] : null;
+		$delimiter = $command['delimiter'] ?? null;
+		if (is_array($delimiter)) {
+			$delimiter = reset($delimiter);
+		}
+		$delimiter = is_numeric($delimiter) ? (int)$delimiter : null;
 		$delimiterChar = isset($command['delimiterChar']) && is_string($command['delimiterChar']) && $command['delimiterChar'] !== ''
 			? $command['delimiterChar'] : null;
 		return new self((int)$command['codepage'], $delimiter, $delimiterChar);
